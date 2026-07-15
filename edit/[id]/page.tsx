@@ -21,7 +21,8 @@ export default function EditTodoPage() {
   useEffect(() => {
     const fetchTodo = async () => {
       try {
-        const response = await fetch(`/api/todos`);
+        const userId = localStorage.getItem('userId');
+        const response = await fetch(`/api/todos?userId=${userId}`);
         const todos: Todo[] = await response.json();
         const found = todos.find((t) => t.id === todoId);
         
@@ -55,6 +56,7 @@ export default function EditTodoPage() {
     setSaving(true);
 
     try {
+      const userId = localStorage.getItem('userId');
       const response = await fetch(`/api/todo/${todoId}`, {
         method: 'PUT',
         headers: {
@@ -64,6 +66,7 @@ export default function EditTodoPage() {
           title: title.trim(),
           description: description.trim(),
           completed,
+          userId,
         }),
       });
 

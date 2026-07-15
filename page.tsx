@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Loader2, BarChart3, LogOut } from 'lucide-react';
+import { Edit2, Loader2, BarChart3, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import TodoItem, { type Todo } from '@/components/TodoItem';
 
@@ -38,7 +38,8 @@ export default function Home() {
   useEffect(() => {
     const fetchTodos = async () => {
       try {
-        const response = await fetch('/api/todos');
+        const userId = localStorage.getItem('userId');
+        const response = await fetch(`/api/todos?userId=${userId}`);
         if (!response.ok) {
           throw new Error('获取待办列表失败');
         }
@@ -59,12 +60,13 @@ export default function Home() {
       const todo = todos.find((t) => t.id === id);
       if (!todo) return;
 
+      const userId = localStorage.getItem('userId');
       const response = await fetch(`/api/todo/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ completed: !todo.completed }),
+        body: JSON.stringify({ completed: !todo.completed, userId }),
       });
 
       if (!response.ok) {
@@ -115,6 +117,7 @@ export default function Home() {
             <button
               onClick={() => {
                 localStorage.removeItem('login-token');
+                localStorage.removeItem('userId');
                 window.location.href = '/login';
               }}
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
@@ -128,13 +131,6 @@ export default function Home() {
               aria-label="查看统计"
             >
               <BarChart3 className="h-6 w-6" />
-            </Link>
-            <Link
-              href="/add"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
-              aria-label="新增待办"
-            >
-              <Plus className="h-6 w-6" />
             </Link>
           </div>
         </div>
@@ -170,7 +166,6 @@ export default function Home() {
               href="/add"
               className="mt-4 inline-flex items-center gap-2 text-terracotta font-medium transition-colors hover:text-terracotta/80"
             >
-              <Plus className="h-5 w-5" />
               <span>创建第一条待办</span>
             </Link>
           </div>

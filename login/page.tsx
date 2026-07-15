@@ -35,6 +35,7 @@ export default function LoginPage() {
 
       if (data.success) {
         localStorage.setItem('login-token', 'ok');
+        localStorage.setItem('userId', String(data.userId));
         router.push('/');
       } else {
         alert(data.msg || '登录失败');

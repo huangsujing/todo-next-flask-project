@@ -41,7 +41,8 @@ export default function StatsPage() {
   useEffect(() => {
     const fetchTodos = async () => {
       try {
-        const response = await fetch('/api/todos');
+        const userId = localStorage.getItem('userId');
+        const response = await fetch(`/api/todos?userId=${userId}`);
         if (!response.ok) {
           throw new Error('获取待办列表失败');
         }

@@ -23,6 +23,7 @@ export default function AddTodoPage() {
     setLoading(true);
 
     try {
+      const userId = localStorage.getItem('userId');
       const response = await fetch('/api/todo', {
         method: 'POST',
         headers: {
@@ -31,6 +32,7 @@ export default function AddTodoPage() {
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
+          userId,
         }),
       });
 
