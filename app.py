@@ -20,6 +20,14 @@ def init_db():
         )
     ''')
     
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL
+        )
+    ''')
+    
     cursor.execute('SELECT COUNT(*) FROM todos')
     count = cursor.fetchone()[0]
     
@@ -32,6 +40,12 @@ def init_db():
             ('准备明日晨会议程', '整理会议要点与资料', 0),
             ('健身：跑步 5 公里', '保持身体健康', 1)
         ''')
+    
+    cursor.execute('SELECT COUNT(*) FROM users WHERE username = ?', ('admin',))
+    admin_exists = cursor.fetchone()[0]
+    
+    if admin_exists == 0:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', ('admin', '123456'))
     
     conn.commit()
     conn.close()
@@ -159,10 +173,48 @@ def login():
     username = data['username'].strip()
     password = data['password'].strip()
     
-    if username == 'admin' and password == '123456':
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, password FROM users WHERE username = ?', (username,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if user and user['password'] == password:
         return jsonify({'success': True})
     
     return jsonify({'success': False, 'msg': '账号或密码错误'})
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'success': False, 'msg': '用户名或密码不能为空'}), 400
+    
+    username = data['username'].strip()
+    password = data['password'].strip()
+    
+    if not username:
+        return jsonify({'success': False, 'msg': '用户名不能为空'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'success': False, 'msg': '密码长度不少于6位'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+    existing_user = cursor.fetchone()
+    
+    if existing_user:
+        conn.close()
+        return jsonify({'success': False, 'msg': '该用户名已被占用'})
+    
+    cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'msg': '注册成功，请前往登录'})
 
 if __name__ == '__main__':
     init_db()

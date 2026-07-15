@@ -10,8 +10,9 @@ export default function AuthGuard() {
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('login-token') === 'ok';
     const isLoginPage = pathname === '/login';
+    const isRegisterPage = pathname === '/register';
 
-    if (!isLoggedIn && !isLoginPage) {
+    if (!isLoggedIn && !isLoginPage && !isRegisterPage) {
       router.push('/login');
     }
   }, [pathname, router]);

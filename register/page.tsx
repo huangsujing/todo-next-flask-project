@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,15 +15,20 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!username.trim() || !password.trim()) {
-      alert('请输入账号和密码');
+    if (!username.trim()) {
+      alert('用户名不能为空');
+      return;
+    }
+
+    if (password.length < 6) {
+      alert('密码长度不少于6位');
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/login', {
+      const response = await fetch('http://127.0.0.1:5000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -34,13 +39,13 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        localStorage.setItem('login-token', 'ok');
-        router.push('/');
+        alert(data.msg || '注册成功');
+        router.push('/login');
       } else {
-        alert(data.msg || '登录失败');
+        alert(data.msg || '注册失败');
       }
     } catch (err) {
-      alert('登录请求失败，请检查后端服务是否启动');
+      alert('注册请求失败，请检查后端服务是否启动');
     } finally {
       setLoading(false);
     }
@@ -53,10 +58,10 @@ export default function LoginPage() {
       >
         <div className="mb-8 text-center">
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-terracotta/10">
-            <LogIn className="h-8 w-8 text-terracotta" />
+            <UserPlus className="h-8 w-8 text-terracotta" />
           </div>
-          <h1 className="font-display text-4xl font-semibold text-ink">欢迎回来</h1>
-          <p className="mt-2 text-sm text-ink-soft">请登录您的账号</p>
+          <h1 className="font-display text-4xl font-semibold text-ink">创建账号</h1>
+          <p className="mt-2 text-sm text-ink-soft">注册后即可使用待办清单</p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-2xl border border-sand bg-white p-8 shadow-sm">
@@ -78,7 +83,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="请输入密码"
+                placeholder="请输入密码（不少于6位）"
                 className="w-full rounded-xl border border-sand bg-paper px-4 py-3 pr-12 text-base text-ink placeholder:text-ink-muted transition-colors focus:border-terracotta focus:outline-none"
               />
               <button
@@ -107,21 +112,17 @@ export default function LoginPage() {
               </svg>
             ) : (
               <>
-                <LogIn className="h-5 w-5" />
-                <span>登录</span>
+                <UserPlus className="h-5 w-5" />
+                <span>注册</span>
               </>
             )}
           </button>
 
           <p className="mt-4 text-center text-sm text-ink-soft">
-            没有账号？
-            <Link href="/register" className="ml-1 text-terracotta font-medium transition-colors hover:text-terracotta/80">
-              去注册
+            已有账号？
+            <Link href="/login" className="ml-1 text-terracotta font-medium transition-colors hover:text-terracotta/80">
+              去登录
             </Link>
-          </p>
-
-          <p className="mt-2 text-center text-xs text-ink-muted">
-            测试账号：admin / 123456
           </p>
         </form>
       </div>

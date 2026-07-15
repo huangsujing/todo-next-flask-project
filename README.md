@@ -34,6 +34,22 @@ todo-next-flask-project
 
 │   │   │           └── page.tsx # 编辑待办页面 /edit/\[id]
 
+│   │   │   └──stats
+
+│   │   │       └── page.tsx       待办统计页面 
+
+│   │   │   ├── login
+
+│   │   │   │   └── page.tsx       # 登录页面 /login
+
+│   │   │   ├── register
+
+│   │   │   │   └── page.tsx       # 注册页面 /register
+
+│   │   │   ├── auth‑guard.tsx      # 登录鉴权组件
+
+│   │   │   └── layout.tsx         # 全局布局、鉴权入口
+
 │   │   └── components       # 公共组件 TodoItem.tsx
 
 │   ├── package.json
@@ -48,15 +64,23 @@ todo-next-flask-project
 
 │   ├── app.py
 
+│   ├── todo.db               # SQLite数据库，存放用户账号和待办数据
+
 │   └── requirements.txt
 
 ├── docs
 
 │   └── screenshots          # AI对话截图、页面预览截图、接口测试截图存放文件夹
 
-│      └── 1.docx
+&#x20;│     └──1.docx
 
 &#x20;│     └──2.docx
+
+&#x20;│     └──3.docx
+
+&#x20;│     └──4.docx
+
+&#x20;│     └──5.docx
 
 ├── prompt\_log.md            # AI提示词日志，存放本次和Trae完整对话记录
 
@@ -118,7 +142,7 @@ python app.py
 
 \## 功能清单
 
-\### 前端页面（3个独立路由）
+\### 前端页面（6个独立路由）
 
 1\. `/`：首页页面，展示全部待办，统计任务数量；
 
@@ -126,15 +150,43 @@ python app.py
 
 3\. `/edit/\[id]`：编辑待办页面，回显原有数据，完成修改操作。
 
+4\. `/stats`：待办统计页面，布局风格和首页保持一致，展示任务数量、完成进度、最近5条待办。
+
+5\. `/login`：登录页面，输入账号密码；只有登录成功之后，才可以访问系统全部页面；未登录强制跳转登录页。
+
+6\. `/register`：注册页面，UI样式和登录页面保持统一；前端校验用户名非空、密码长度≥6；注册成功自动跳转登录页面。
+
+\### 后端接口（5个API）
+
+| 请求方式 | 接口地址 | 功能 | 请求参数 | 返回结果说明 |
+
+|:---:|:---:|:---|:---|:---|
+
+| GET | `/api/todos` | 查询全部待办 | 无 | 返回全部待办列表 |
+
+| POST | `/api/todo` | 新增待办 | title，completed | 添加一条待办数据 |
+
+| PUT | `/api/todo/<id>` | 修改待办 | completed | 更新待办完成状态 |
+
+| POST | `/api/login` | 用户登录 | username，password | 账号正确返回{success:true}，错误返回提示信息 |
+
+| POST | `/api/register` | 用户注册 | username，password | 用户名唯一，重复提示占用；注册成功返回成功提示；后端自动创建user数据表。
+
+\## 项目业务流程
+
+1\. 用户访问系统，未登录状态会被鉴权组件拦截强制跳转到登录页面；
+
+2\. 新用户先进入`/register`页面注册账号，账号存入SQLite数据库；
+
+3\. 注册完成跳转到登录页面，输入账号密码登录；登录成功后前端localStorage保存登录标识；
+
+4\. 登录成功后正常使用首页查看待办、新增待办、编辑待办、查看统计页面；
+
+5\. 用户点击退出登录按钮，清除本地登录缓存，重新回到登录页面。
 
 
-\### 后端接口（3个API）
 
-1\. `GET /api/todos`：查询全部待办；
+\### 测试账号
 
-2\. `POST /api/todo`：新增待办；
-
-3\. `PUT /api/todo/<id>`：修改待办。
-
-
+默认内置账号：用户名：`admin`，密码：`123456`。
 
