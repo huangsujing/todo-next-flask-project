@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Loader2, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import TodoItem, { type Todo } from '@/components/TodoItem';
 
@@ -111,13 +111,22 @@ export default function Home() {
               <p className="text-sm text-ink-soft">{dateStr}</p>
             </div>
           </div>
-          <Link
-            href="/add"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
-            aria-label="新增待办"
-          >
-            <Plus className="h-6 w-6" />
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/stats"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
+              aria-label="查看统计"
+            >
+              <BarChart3 className="h-6 w-6" />
+            </Link>
+            <Link
+              href="/add"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
+              aria-label="新增待办"
+            >
+              <Plus className="h-6 w-6" />
+            </Link>
+          </div>
         </div>
       </header>
 
