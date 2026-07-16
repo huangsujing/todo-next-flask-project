@@ -3,12 +3,18 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { type Todo } from '@/components/TodoItem';
+
+interface Todo {
+  id: number;
+  title: string;
+  description: string;
+  completed: boolean;
+}
 
 export default function EditTodoPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const todoId = parseInt(params.id);
+  const todoId = parseInt(params.id, 10);
 
   const [todo, setTodo] = useState<Todo | null>(null);
   const [title, setTitle] = useState('');
@@ -20,8 +26,20 @@ export default function EditTodoPage() {
 
   useEffect(() => {
     const fetchTodo = async () => {
+      if (isNaN(todoId)) {
+        setError('无效的待办ID');
+        setLoading(false);
+        return;
+      }
+
       try {
         const userId = localStorage.getItem('userId');
+        if (!userId) {
+          alert('请先登录');
+          router.push('/login');
+          return;
+        }
+
         const response = await fetch(`/api/todos?userId=${userId}`);
         const todos: Todo[] = await response.json();
         const found = todos.find((t) => t.id === todoId);
@@ -42,13 +60,21 @@ export default function EditTodoPage() {
     };
 
     fetchTodo();
-  }, [todoId]);
+  }, [todoId, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       setError('请输入待办标题');
+      return;
+    }
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('请先登录');
+      router.push('/login');
       return;
     }
 
@@ -56,14 +82,13 @@ export default function EditTodoPage() {
     setSaving(true);
 
     try {
-      const userId = localStorage.getItem('userId');
       const response = await fetch(`/api/todo/${todoId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: title.trim(),
+          title: trimmedTitle,
           description: description.trim(),
           completed,
           userId,
@@ -107,16 +132,11 @@ export default function EditTodoPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-xl px-6 py-16 sm:py-24">
-      {/* 返回按钮 */}
-      <button
-        onClick={() => router.back()}
-        className="mb-8 flex items-center gap-2 text-ink-soft transition-colors hover:text-terracotta"
-      >
+      <button onClick={() => router.back()} className="mb-8 flex items-center gap-2 text-ink-soft transition-colors hover:text-terracotta">
         <ArrowLeft className="h-5 w-5" />
         <span className="text-sm font-medium">返回列表</span>
       </button>
 
-      {/* 标题区 */}
       <header className="mb-10">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
           Edit · 编辑待办
@@ -126,14 +146,9 @@ export default function EditTodoPage() {
         </h1>
       </header>
 
-      {/* 表单 */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 标题输入 */}
         <div>
-          <label
-            htmlFor="title"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
+          <label htmlFor="title" className="mb-2 block text-sm font-medium text-ink">
             标题 <span className="text-terracotta">*</span>
           </label>
           <input
@@ -147,12 +162,8 @@ export default function EditTodoPage() {
           />
         </div>
 
-        {/* 描述输入 */}
         <div>
-          <label
-            htmlFor="description"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
+          <label htmlFor="description" className="mb-2 block text-sm font-medium text-ink">
             描述
           </label>
           <textarea
@@ -166,7 +177,6 @@ export default function EditTodoPage() {
           />
         </div>
 
-        {/* 完成状态切换 */}
         <div className="flex items-center justify-between rounded-xl border border-sand bg-paper px-4 py-3">
           <span className="text-sm font-medium text-ink">完成状态</span>
           <button
@@ -177,20 +187,14 @@ export default function EditTodoPage() {
               completed ? 'bg-terracotta' : 'bg-sand'
             }`}
           >
-            <span
-              className={`absolute h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                completed ? 'translate-x-5' : 'translate-x-0.5'
-              }`}
-            />
+            <span className={`absolute h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+              completed ? 'translate-x-5' : 'translate-x-0.5'
+            }`} />
           </button>
         </div>
 
-        {/* 错误提示 */}
-        {error && (
-          <p className="text-sm text-terracotta">{error}</p>
-        )}
+        {error && <p className="text-sm text-terracotta">{error}</p>}
 
-        {/* 提交按钮 */}
         <button
           type="submit"
           disabled={saving}

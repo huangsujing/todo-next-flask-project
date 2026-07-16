@@ -68,18 +68,17 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_user_id_from_request():
-    data = request.get_json()
-    if not data or 'userId' not in data:
-        return None
-    return data.get('userId')
-
 @app.route('/api/todos', methods=['GET'])
 def get_todos():
-    user_id = request.args.get('userId')
+    user_id_param = request.args.get('userId')
     
-    if not user_id:
+    if not user_id_param:
         return jsonify({'error': '用户ID不能为空'}), 400
+    
+    try:
+        user_id = int(user_id_param)
+    except ValueError:
+        return jsonify({'error': '用户ID格式错误'}), 400
     
     conn = None
     try:
@@ -114,20 +113,17 @@ def create_todo():
     
     title = data['title'].strip()
     description = data.get('description', '').strip()
-    user_id = data['userId']
     
     if not title:
         return jsonify({'error': '标题不能为空'}), 400
     
+    try:
+        user_id = int(data['userId'])
+    except ValueError:
+        return jsonify({'error': '用户ID格式错误'}), 400
+    
     conn = get_db()
     cursor = conn.cursor()
-    
-    cursor.execute('SELECT id FROM users WHERE id = ?', (user_id,))
-    user = cursor.fetchone()
-    
-    if not user:
-        conn.close()
-        return jsonify({'error': '用户不存在'}), 404
     
     cursor.execute(
         'INSERT INTO todos (title, description, completed, user_id) VALUES (?, ?, ?, ?)',
@@ -155,7 +151,10 @@ def update_todo(todo_id):
     if not data or 'userId' not in data:
         return jsonify({'error': '用户ID不能为空'}), 400
     
-    user_id = data['userId']
+    try:
+        user_id = int(data['userId'])
+    except ValueError:
+        return jsonify({'error': '用户ID格式错误'}), 400
     
     conn = get_db()
     cursor = conn.cursor()
@@ -167,7 +166,7 @@ def update_todo(todo_id):
         conn.close()
         return jsonify({'error': '待办不存在'}), 404
     
-    if todo['user_id'] != user_id:
+    if int(todo['user_id']) != user_id:
         conn.close()
         return jsonify({'error': '无权操作此待办'}), 403
     
@@ -214,6 +213,9 @@ def login():
     
     username = data['username'].strip()
     password = data['password'].strip()
+    
+    if not username or not password:
+        return jsonify({'success': False, 'msg': '账号或密码不能为空'}), 400
     
     conn = get_db()
     cursor = conn.cursor()

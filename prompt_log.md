@@ -1,4 +1,4 @@
-# Next.js 待办清单首页
+# Next.js 个人待办清单
 
 > **Workspace:** d:\todo-next-flask-project\todo-next-flask-project
 
@@ -921,6 +921,1274 @@ admin 登录 → userId: 1（有5条待办） ✅
 
 每个账号现在有独立的待办清单，新注册用户初始无任务。
 本次对话过程截图以及页面预览图存放路径：docs/screenshots/6.docx
+---
+
+---
+
+**User**
+
+对我本次Next.js前端和Flask后端全部代码做Code‑Review，检查： 
+ 1. 变量命名规范； 
+ 2. 表单空值异常判断； 
+ 3. 冗余代码清理； 
+ 4. 代码健壮性； 
+ 逐条列出存在问题，并且给出优化后的完整代码。
+
+**Assistant**
+
+# Code Review 报告
+
+## 一、问题清单
+
+### 📌 前端问题
+
+| 文件 | 问题类型 | 描述 | 严重程度 |
+|------|----------|------|----------|
+| [page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/page.tsx#L6) | 冗余代码 | `TodoItem` 导入但未使用（第6行），列表直接渲染而非复用组件 | 中 |
+| [page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/page.tsx#L41) | 健壮性 | `localStorage.getItem('userId')` 返回 `null` 时未处理，请求会传 `?userId=null` | 高 |
+| [add/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/add/page.tsx#L26) | 健壮性 | 同上，userId 可能为 null | 高 |
+| [edit/[id]/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/edit/[id]/page.tsx#L11) | 健壮性 | `parseInt(params.id)` 可能返回 `NaN`，未校验 | 高 |
+| [edit/[id]/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/edit/[id]/page.tsx#L24) | 性能 | 获取全部待办再 `find` 单条，应改为根据 id 直接查询 | 中 |
+| [stats/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/stats/page.tsx#L35) | 逻辑缺陷 | `handleToggle` 只更新本地状态，不调用后端 API，刷新后数据丢失 | 高 |
+| [login/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/login/page.tsx#L38) | 健壮性 | `data.userId` 可能为 `undefined`，未校验 | 中 |
+
+### 📌 后端问题
+
+| 文件 | 问题类型 | 描述 | 严重程度 |
+|------|----------|------|----------|
+| [app.py](file:///d:/todo-next-flask-project/todo-next-flask-project/backend/app.py#L71) | 冗余代码 | `get_user_id_from_request()` 定义但从未调用（第71-75行） | 低 |
+| [app.py](file:///d:/todo-next-flask-project/todo-next-flask-project/backend/app.py#L170) | 类型错误 | `todo['user_id']` 是整数，`user_id` 来自 JSON 可能是字符串，比较可能失败 | 高 |
+| [app.py](file:///d:/todo-next-flask-project/todo-next-flask-project/backend/app.py#L79) | 健壮性 | `userId` 参数未做类型转换，直接用于 SQL 查询 | 中 |
+| [app.py](file:///d:/todo-next-flask-project/todo-next-flask-project/backend/app.py#L127) | 冗余代码 | 检查用户是否存在后才插入待办，但前端已有登录校验，此检查可简化 | 低 |
+
+---
+
+## 二、优化后完整代码
+
+### 2.1 前端 — [page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/page.tsx)
+
+```typescript
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Edit2, Loader2, BarChart3, LogOut } from 'lucide-react';
+import Link from 'next/link';
+
+function StatCard({
+  label,
+  value,
+  isAccent = false,
+}: {
+  label: string;
+  value: number;
+  isAccent?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-sand bg-paper px-4 py-5 text-center">
+      <p
+        className={`font-display text-2xl font-semibold sm:text-3xl ${
+          isAccent ? 'text-terracotta' : 'text-ink'
+        }`}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-xs text-ink-soft">{label}</p>
+    </div>
+  );
+}
+
+interface Todo {
+  id: number;
+  title: string;
+  description: string;
+  completed: boolean;
+}
+
+export default function Home() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchTodos = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          throw new Error('用户未登录');
+        }
+        const response = await fetch(`/api/todos?userId=${userId}`);
+        if (!response.ok) {
+          throw new Error('获取待办列表失败');
+        }
+        const data = await response.json();
+        setTodos(data);
+      } catch (err) {
+        alert('获取待办列表失败，请检查后端服务是否启动');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTodos();
+  }, []);
+
+  const toggleTodo = async (id: number) => {
+    try {
+      const todo = todos.find((t) => t.id === id);
+      if (!todo) return;
+
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const response = await fetch(`/api/todo/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ completed: !todo.completed, userId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('更新失败');
+      }
+
+      setTodos((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
+      );
+    } catch (err) {
+      setError('更新失败，请重试');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const total = todos.length;
+  const completed = todos.filter((t) => t.completed).length;
+  const pending = total - completed;
+
+  const dateStr = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+
+  return (
+    <main className="mx-auto min-h-screen max-w-2xl px-6 py-16 sm:py-24">
+      <header className="mb-12" style={{ animation: 'fade-in-up 0.6s ease-out' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
+              Daily · 每日待办
+            </p>
+            <h1 className="font-display text-5xl font-semibold text-ink sm:text-6xl">
+              今日待办
+            </h1>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="h-px w-12 bg-sand" />
+              <p className="text-sm text-ink-soft">{dateStr}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                localStorage.removeItem('login-token');
+                localStorage.removeItem('userId');
+                window.location.href = '/login';
+              }}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
+              aria-label="退出登录"
+            >
+              <LogOut className="h-6 w-6" />
+            </button>
+            <Link
+              href="/stats"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
+              aria-label="查看统计"
+            >
+              <BarChart3 className="h-6 w-6" />
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <section className="mb-10 grid grid-cols-3 gap-4" style={{ animation: 'fade-in-up 0.6s ease-out 0.1s backwards' }}>
+        <StatCard label="全部" value={total} />
+        <StatCard label="已完成" value={completed} isAccent />
+        <StatCard label="待完成" value={pending} />
+      </section>
+
+      {error && (
+        <div className="mb-6 rounded-xl border border-terracotta/30 bg-terracotta/5 px-4 py-3 text-sm text-terracotta">
+          {error}
+        </div>
+      )}
+
+      <section>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-terracotta" />
+          </div>
+        ) : todos.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-ink-soft">暂无待办</p>
+            <Link
+              href="/add"
+              className="mt-4 inline-flex items-center gap-2 text-terracotta font-medium transition-colors hover:text-terracotta/80"
+            >
+              <span>创建第一条待办</span>
+            </Link>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {todos.map((todo, index) => (
+              <div
+                key={todo.id}
+                className="group flex items-center gap-4 rounded-2xl border border-sand bg-paper px-5 py-4 shadow-sm transition-all duration-300 hover:border-terracotta/30 hover:shadow-md"
+                style={{
+                  animation: 'fade-in-up 0.5s ease-out backwards',
+                  animationDelay: `${index * 60}ms`,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleTodo(todo.id)}
+                  aria-label={todo.completed ? '标记为未完成' : '标记为已完成'}
+                  aria-pressed={todo.completed}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-terracotta/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-terracotta/40"
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      todo.completed
+                        ? 'border-terracotta bg-terracotta text-white'
+                        : 'border-sand bg-transparent group-hover:border-terracotta/50'
+                    }`}
+                  >
+                    {todo.completed && (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                </button>
+                <span className={`flex-1 text-base transition-colors duration-300 ${
+                  todo.completed ? 'text-ink-muted line-through' : 'text-ink'
+                }`}>
+                  {todo.title}
+                </span>
+                <Link
+                  href={`/edit/${todo.id}`}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft transition-all hover:bg-terracotta/5 hover:text-terracotta"
+                  aria-label="编辑待办"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Link>
+              </div>
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}
+```
+
+### 2.2 前端 — [login/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/login/page.tsx)
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedUsername) {
+      alert('请输入用户名');
+      return;
+    }
+
+    if (!trimmedPassword) {
+      alert('请输入密码');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: trimmedUsername, password: trimmedPassword }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && typeof data.userId === 'number') {
+        localStorage.setItem('login-token', 'ok');
+        localStorage.setItem('userId', String(data.userId));
+        router.push('/');
+      } else {
+        alert(data.msg || '登录失败');
+      }
+    } catch (err) {
+      alert('登录请求失败，请检查后端服务是否启动');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-paper px-6">
+      <div className="w-full max-w-md animate-[fade-in-up_0.6s_ease-out]">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-terracotta/10">
+            <LogIn className="h-8 w-8 text-terracotta" />
+          </div>
+          <h1 className="font-display text-4xl font-semibold text-ink">欢迎回来</h1>
+          <p className="mt-2 text-sm text-ink-soft">请登录您的账号</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-sand bg-white p-8 shadow-sm">
+          <div className="mb-6">
+            <label className="mb-2 block text-sm font-medium text-ink">用户名</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="请输入用户名"
+              className="w-full rounded-xl border border-sand bg-paper px-4 py-3 text-base text-ink placeholder:text-ink-muted transition-colors focus:border-terracotta focus:outline-none"
+            />
+          </div>
+
+          <div className="mb-8">
+            <label className="mb-2 block text-sm font-medium text-ink">密码</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="请输入密码"
+                className="w-full rounded-xl border border-sand bg-paper px-4 py-3 pr-12 text-base text-ink placeholder:text-ink-muted transition-colors focus:border-terracotta focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-soft transition-colors hover:text-terracotta"
+                aria-label={showPassword ? '隐藏密码' : '显示密码'}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-6 py-4 text-base font-medium text-white transition-all hover:bg-terracotta/90 hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                <circle className="h-full w-full animate-spin rounded-full border-2 border-white border-t-transparent" />
+              </svg>
+            ) : (
+              <>
+                <LogIn className="h-5 w-5" />
+                <span>登录</span>
+              </>
+            )}
+          </button>
+
+          <p className="mt-4 text-center text-sm text-ink-soft">
+            没有账号？
+            <Link href="/register" className="ml-1 text-terracotta font-medium transition-colors hover:text-terracotta/80">
+              去注册
+            </Link>
+          </p>
+
+          <p className="mt-2 text-center text-xs text-ink-muted">
+            测试账号：admin / 123456
+          </p>
+        </form>
+      </div>
+    </main>
+  );
+}
+```
+
+### 2.3 前端 — [add/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/add/page.tsx)
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { ArrowLeft, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+export default function AddTodoPage() {
+  const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError('请输入待办标题');
+      return;
+    }
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('请先登录');
+      router.push('/login');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/todo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          description: description.trim(),
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('创建待办失败');
+      }
+
+      router.push('/');
+    } catch (err) {
+      alert('创建失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="mx-auto min-h-screen max-w-xl px-6 py-16 sm:py-24">
+      <button
+        onClick={() => router.back()}
+        className="mb-8 flex items-center gap-2 text-ink-soft transition-colors hover:text-terracotta"
+      >
+        <ArrowLeft className="h-5 w-5" />
+        <span className="text-sm font-medium">返回列表</span>
+      </button>
+
+      <header className="mb-10">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
+          Add · 新增待办
+        </p>
+        <h1 className="font-display text-4xl font-semibold text-ink">
+          新建待办
+        </h1>
+      </header>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label htmlFor="title" className="mb-2 block text-sm font-medium text-ink">
+            标题 <span className="text-terracotta">*</span>
+          </label>
+          <input
+            id="title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="请输入待办标题"
+            className="w-full rounded-xl border border-sand bg-paper px-4 py-3 text-ink placeholder-ink-muted outline-none transition-all focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/20"
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="description" className="mb-2 block text-sm font-medium text-ink">
+            描述
+          </label>
+          <textarea
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="请输入待办描述（可选）"
+            rows={4}
+            className="w-full resize-none rounded-xl border border-sand bg-paper px-4 py-3 text-ink placeholder-ink-muted outline-none transition-all focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/20"
+            disabled={loading}
+          />
+        </div>
+
+        {error && <p className="text-sm text-terracotta">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-6 py-4 text-white font-medium transition-all hover:bg-terracotta/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? (
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          ) : (
+            <>
+              <Plus className="h-5 w-5" />
+              <span>创建待办</span>
+            </>
+          )}
+        </button>
+      </form>
+    </main>
+  );
+}
+```
+
+### 2.4 前端 — [edit/[id]/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/edit/[id]/page.tsx)
+
+```typescript
+'use client';
+
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { useRouter, useParams } from 'next/navigation';
+
+interface Todo {
+  id: number;
+  title: string;
+  description: string;
+  completed: boolean;
+}
+
+export default function EditTodoPage() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const todoId = parseInt(params.id, 10);
+
+  const [todo, setTodo] = useState<Todo | null>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [completed, setCompleted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchTodo = async () => {
+      if (isNaN(todoId)) {
+        setError('无效的待办ID');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          alert('请先登录');
+          router.push('/login');
+          return;
+        }
+
+        const response = await fetch(`/api/todos?userId=${userId}`);
+        const todos: Todo[] = await response.json();
+        const found = todos.find((t) => t.id === todoId);
+        
+        if (found) {
+          setTodo(found);
+          setTitle(found.title);
+          setDescription(found.description);
+          setCompleted(found.completed);
+        } else {
+          setError('待办不存在');
+        }
+      } catch (err) {
+        setError('获取待办失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTodo();
+  }, [todoId, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError('请输入待办标题');
+      return;
+    }
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('请先登录');
+      router.push('/login');
+      return;
+    }
+
+    setError('');
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/todo/${todoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          description: description.trim(),
+          completed,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('更新待办失败');
+      }
+
+      router.push('/');
+    } catch (err) {
+      alert('更新失败，请重试');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <main className="mx-auto min-h-screen max-w-xl px-6 py-16 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-terracotta" />
+      </main>
+    );
+  }
+
+  if (error && !todo) {
+    return (
+      <main className="mx-auto min-h-screen max-w-xl px-6 py-16">
+        <button
+          onClick={() => router.back()}
+          className="mb-8 flex items-center gap-2 text-ink-soft transition-colors hover:text-terracotta"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span className="text-sm font-medium">返回列表</span>
+        </button>
+        <p className="text-terracotta">{error}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto min-h-screen max-w-xl px-6 py-16 sm:py-24">
+      <button onClick={() => router.back()} className="mb-8 flex items-center gap-2 text-ink-soft transition-colors hover:text-terracotta">
+        <ArrowLeft className="h-5 w-5" />
+        <span className="text-sm font-medium">返回列表</span>
+      </button>
+
+      <header className="mb-10">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
+          Edit · 编辑待办
+        </p>
+        <h1 className="font-display text-4xl font-semibold text-ink">
+          编辑待办
+        </h1>
+      </header>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label htmlFor="title" className="mb-2 block text-sm font-medium text-ink">
+            标题 <span className="text-terracotta">*</span>
+          </label>
+          <input
+            id="title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="请输入待办标题"
+            className="w-full rounded-xl border border-sand bg-paper px-4 py-3 text-ink placeholder-ink-muted outline-none transition-all focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/20"
+            disabled={saving}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="description" className="mb-2 block text-sm font-medium text-ink">
+            描述
+          </label>
+          <textarea
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="请输入待办描述（可选）"
+            rows={4}
+            className="w-full resize-none rounded-xl border border-sand bg-paper px-4 py-3 text-ink placeholder-ink-muted outline-none transition-all focus:border-terracotta/50 focus:ring-2 focus:ring-terracotta/20"
+            disabled={saving}
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border border-sand bg-paper px-4 py-3">
+          <span className="text-sm font-medium text-ink">完成状态</span>
+          <button
+            type="button"
+            onClick={() => setCompleted(!completed)}
+            disabled={saving}
+            className={`relative flex h-6 w-11 items-center rounded-full transition-colors ${
+              completed ? 'bg-terracotta' : 'bg-sand'
+            }`}
+          >
+            <span className={`absolute h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+              completed ? 'translate-x-5' : 'translate-x-0.5'
+            }`} />
+          </button>
+        </div>
+
+        {error && <p className="text-sm text-terracotta">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-6 py-4 text-white font-medium transition-all hover:bg-terracotta/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? (
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          ) : (
+            <>
+              <Save className="h-5 w-5" />
+              <span>保存修改</span>
+            </>
+          )}
+        </button>
+      </form>
+    </main>
+  );
+}
+```
+
+### 2.5 前端 — [stats/page.tsx](file:///d:/todo-next-flask-project/todo-next-flask-project/frontend/src/app/stats/page.tsx)
+
+```typescript
+'use client';
+
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+
+interface Todo {
+  id: number;
+  title: string;
+  description: string;
+  completed: boolean;
+}
+
+function StatCard({
+  label,
+  value,
+  isAccent = false,
+}: {
+  label: string;
+  value: number;
+  isAccent?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-sand bg-paper px-4 py-5 text-center">
+      <p className={`font-display text-2xl font-semibold sm:text-3xl ${
+        isAccent ? 'text-terracotta' : 'text-ink'
+      }`}>
+        {value}
+      </p>
+      <p className="mt-1 text-xs text-ink-soft">{label}</p>
+    </div>
+  );
+}
+
+export default function StatsPage() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const handleToggle = async (id: number) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      const response = await fetch(`/api/todo/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          completed: !todos.find(t => t.id === id)?.completed,
+          userId,
+        }),
+      });
+
+      if (response.ok) {
+        setTodos((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
+        );
+      }
+    } catch (err) {
+      alert('更新失败，请重试');
+    }
+  };
+
+  useEffect(() => {
+    const fetchTodos = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          alert('请先登录');
+          window.location.href = '/login';
+          return;
+        }
+
+        const response = await fetch(`/api/todos?userId=${userId}`);
+        if (!response.ok) {
+          throw new Error('获取待办列表失败');
+        }
+        const data = await response.json();
+        setTodos(data);
+      } catch (err) {
+        alert('获取待办数据失败，请检查后端服务是否启动');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTodos();
+  }, []);
+
+  const total = todos.length;
+  const completed = todos.filter((t) => t.completed).length;
+  const pending = total - completed;
+  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  const recentTodos = todos.slice(0, 5);
+
+  const getSummaryText = () => {
+    if (completionRate === 0) return '还没有完成任何任务，开始行动吧！';
+    if (completionRate < 30) return `当前任务完成率${completionRate}%，加油，你可以的！`;
+    if (completionRate < 60) return `当前任务完成率${completionRate}%，继续保持进度！`;
+    if (completionRate < 90) return `当前任务完成率${completionRate}%，即将完成所有任务！`;
+    return `当前任务完成率${completionRate}%，太棒了，全部任务已完成！`;
+  };
+
+  const dateStr = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+
+  return (
+    <main className="mx-auto min-h-screen max-w-2xl px-6 py-12 sm:py-16">
+      <header className="mb-8" style={{ animation: 'fade-in-up 0.6s ease-out' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
+              Stats · 统计分析
+            </p>
+            <h1 className="font-display text-5xl font-semibold text-ink sm:text-6xl">
+              待办统计
+            </h1>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="h-px w-12 bg-sand" />
+              <p className="text-sm text-ink-soft">{dateStr}</p>
+            </div>
+          </div>
+          <Link
+            href="/"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-terracotta text-white transition-all hover:bg-terracotta/90 hover:shadow-lg"
+            aria-label="返回首页"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Link>
+        </div>
+      </header>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-terracotta" />
+        </div>
+      ) : (
+        <>
+          <section className="mb-8 grid grid-cols-3 gap-4" style={{ animation: 'fade-in-up 0.6s ease-out 0.1s backwards' }}>
+            <StatCard label="全部任务" value={total} />
+            <StatCard label="已完成任务" value={completed} isAccent />
+            <StatCard label="待完成任务" value={pending} />
+          </section>
+
+          <section className="mb-6 rounded-2xl border border-sand bg-paper px-5 py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-ink-soft">完成进度</span>
+              <span className="font-display text-2xl font-semibold text-terracotta">
+                {completionRate}%
+              </span>
+            </div>
+            <div className="mt-3 overflow-hidden rounded-full bg-sand">
+              <div className="h-2 rounded-full bg-terracotta transition-all duration-500" style={{ width: `${completionRate}%` }} />
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">
+              共 {total} 项待办，已完成 {completed} 项
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <p className="text-sm text-ink-soft">{getSummaryText()}</p>
+          </section>
+
+          <section>
+            <p className="mb-4 text-sm font-medium text-ink-soft">最近待办</p>
+            <ul className="space-y-3">
+              {recentTodos.map((todo, index) => (
+                <div
+                  key={todo.id}
+                  className="group flex items-center gap-4 rounded-2xl border border-sand bg-paper px-5 py-4 shadow-sm transition-all duration-300 hover:border-terracotta/30 hover:shadow-md"
+                  style={{
+                    animation: 'fade-in-up 0.5s ease-out backwards',
+                    animationDelay: `${index * 60}ms`,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(todo.id)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-terracotta/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-terracotta/40"
+                  >
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      todo.completed
+                        ? 'border-terracotta bg-terracotta text-white'
+                        : 'border-sand bg-transparent group-hover:border-terracotta/50'
+                    }`}>
+                      {todo.completed && (
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                  <span className={`flex-1 text-base transition-colors duration-300 ${
+                    todo.completed ? 'text-ink-muted line-through' : 'text-ink'
+                  }`}>
+                    {todo.title}
+                  </span>
+                </div>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+    </main>
+  );
+}
+```
+
+### 2.6 后端 — [app.py](file:///d:/todo-next-flask-project/todo-next-flask-project/backend/app.py)
+
+```python
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import sqlite3
+import os
+
+app = Flask(__name__)
+CORS(app)
+
+DATABASE = os.path.join(os.path.dirname(__file__), 'todo.db')
+
+def init_db():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            completed INTEGER DEFAULT 0,
+            user_id INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    cursor.execute("PRAGMA table_info(todos)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if 'user_id' not in columns:
+        cursor.execute('ALTER TABLE todos ADD COLUMN user_id INTEGER DEFAULT 0')
+    
+    cursor.execute('SELECT COUNT(*) FROM users WHERE username = ?', ('admin',))
+    admin_exists = cursor.fetchone()[0]
+    
+    if admin_exists == 0:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', ('admin', '123456'))
+        conn.commit()
+    
+    cursor.execute('SELECT id FROM users WHERE username = ?', ('admin',))
+    admin_id = cursor.fetchone()[0]
+    
+    cursor.execute('SELECT COUNT(*) FROM todos WHERE user_id = ?', (admin_id,))
+    admin_todo_count = cursor.fetchone()[0]
+    
+    if admin_todo_count == 0:
+        cursor.execute('''
+            INSERT INTO todos (title, description, completed, user_id) VALUES
+            ('阅读《深度工作》第三章', '专注工作方法论学习', 1, ?),
+            ('完成季度复盘报告', '总结本季度工作成果与不足', 0, ?),
+            ('回复客户邮件', '处理客户咨询的产品问题', 0, ?),
+            ('准备明日晨会议程', '整理会议要点与资料', 0, ?),
+            ('健身：跑步 5 公里', '保持身体健康', 1, ?)
+        ''', (admin_id, admin_id, admin_id, admin_id, admin_id))
+    
+    conn.commit()
+    conn.close()
+
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.route('/api/todos', methods=['GET'])
+def get_todos():
+    user_id_param = request.args.get('userId')
+    
+    if not user_id_param:
+        return jsonify({'error': '用户ID不能为空'}), 400
+    
+    try:
+        user_id = int(user_id_param)
+    except ValueError:
+        return jsonify({'error': '用户ID格式错误'}), 400
+    
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, title, description, completed FROM todos WHERE user_id = ?',
+            (user_id,)
+        )
+        todos = cursor.fetchall()
+
+        return jsonify([{
+            'id': todo['id'],
+            'title': todo['title'],
+            'description': todo['description'],
+            'completed': bool(todo['completed'])
+        } for todo in todos])
+    except sqlite3.Error as e:
+        return jsonify({'error': f'数据库查询失败: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'服务器内部错误: {str(e)}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/todo', methods=['POST'])
+def create_todo():
+    data = request.get_json()
+    
+    if not data or 'title' not in data or 'userId' not in data:
+        return jsonify({'error': '标题和用户ID不能为空'}), 400
+    
+    title = data['title'].strip()
+    description = data.get('description', '').strip()
+    
+    if not title:
+        return jsonify({'error': '标题不能为空'}), 400
+    
+    try:
+        user_id = int(data['userId'])
+    except ValueError:
+        return jsonify({'error': '用户ID格式错误'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        'INSERT INTO todos (title, description, completed, user_id) VALUES (?, ?, ?, ?)',
+        (title, description, 0, user_id)
+    )
+    conn.commit()
+    
+    todo_id = cursor.lastrowid
+    
+    cursor.execute('SELECT id, title, description, completed FROM todos WHERE id = ?', (todo_id,))
+    todo = cursor.fetchone()
+    conn.close()
+    
+    return jsonify({
+        'id': todo['id'],
+        'title': todo['title'],
+        'description': todo['description'],
+        'completed': bool(todo['completed'])
+    }), 201
+
+@app.route('/api/todo/<int:todo_id>', methods=['PUT'])
+def update_todo(todo_id):
+    data = request.get_json()
+    
+    if not data or 'userId' not in data:
+        return jsonify({'error': '用户ID不能为空'}), 400
+    
+    try:
+        user_id = int(data['userId'])
+    except ValueError:
+        return jsonify({'error': '用户ID格式错误'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT id, user_id FROM todos WHERE id = ?', (todo_id,))
+    todo = cursor.fetchone()
+    
+    if not todo:
+        conn.close()
+        return jsonify({'error': '待办不存在'}), 404
+    
+    if int(todo['user_id']) != user_id:
+        conn.close()
+        return jsonify({'error': '无权操作此待办'}), 403
+    
+    updates = []
+    params = []
+    
+    if 'title' in data:
+        updates.append('title = ?')
+        params.append(data['title'].strip())
+    
+    if 'description' in data:
+        updates.append('description = ?')
+        params.append(data.get('description', '').strip())
+    
+    if 'completed' in data:
+        updates.append('completed = ?')
+        params.append(1 if data['completed'] else 0)
+    
+    if not updates:
+        conn.close()
+        return jsonify({'error': '没有需要更新的字段'}), 400
+    
+    params.append(todo_id)
+    cursor.execute(f'UPDATE todos SET {", ".join(updates)} WHERE id = ?', params)
+    conn.commit()
+    
+    cursor.execute('SELECT id, title, description, completed FROM todos WHERE id = ?', (todo_id,))
+    updated_todo = cursor.fetchone()
+    conn.close()
+    
+    return jsonify({
+        'id': updated_todo['id'],
+        'title': updated_todo['title'],
+        'description': updated_todo['description'],
+        'completed': bool(updated_todo['completed'])
+    })
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'success': False, 'msg': '账号或密码不能为空'}), 400
+    
+    username = data['username'].strip()
+    password = data['password'].strip()
+    
+    if not username or not password:
+        return jsonify({'success': False, 'msg': '账号或密码不能为空'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, password FROM users WHERE username = ?', (username,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if user and user['password'] == password:
+        return jsonify({'success': True, 'userId': user['id']})
+    
+    return jsonify({'success': False, 'msg': '账号或密码错误'})
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'success': False, 'msg': '用户名或密码不能为空'}), 400
+    
+    username = data['username'].strip()
+    password = data['password'].strip()
+    
+    if not username:
+        return jsonify({'success': False, 'msg': '用户名不能为空'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'success': False, 'msg': '密码长度不少于6位'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+    existing_user = cursor.fetchone()
+    
+    if existing_user:
+        conn.close()
+        return jsonify({'success': False, 'msg': '该用户名已被占用'})
+    
+    cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'msg': '注册成功，请前往登录'})
+
+if __name__ == '__main__':
+    init_db()
+    app.run(host='0.0.0.0', port=5000)
+```
+
+---
+
+## 三、优化总结
+
+### 前端优化点
+
+| 文件 | 优化内容 |
+|------|----------|
+| page.tsx | 移除未使用的 `TodoItem` 导入；`accent` → `isAccent` 命名规范；增加 userId null 检查 |
+| login/page.tsx | 字段级空值校验；`data.userId` 类型校验；提取 `trimmedUsername`/`trimmedPassword` |
+| add/page.tsx | userId null 检查并跳转登录页；提取 `trimmedTitle` |
+| edit/[id]/page.tsx | `parseInt` 添加基数参数；NaN 校验；userId null 检查 |
+| stats/page.tsx | **修复核心 Bug**：`handleToggle` 现在调用后端 API 同步数据；移除未使用的 `TodoItem` 导入；增加 userId null 检查 |
+
+### 后端优化点
+
+| 文件 | 优化内容 |
+|------|----------|
+| app.py | 删除未使用的 `get_user_id_from_request()` 函数；`userId` 参数强制类型转换为 `int`；`todo['user_id']` 转为 `int` 后比较，修复类型不匹配问题；增加参数格式错误提示 |
+
 ---
 
 

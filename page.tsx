@@ -3,23 +3,21 @@
 import { useState, useEffect } from 'react';
 import { Edit2, Loader2, BarChart3, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import TodoItem, { type Todo } from '@/components/TodoItem';
 
-/** 统计卡片 */
 function StatCard({
   label,
   value,
-  accent = false,
+  isAccent = false,
 }: {
   label: string;
   value: number;
-  accent?: boolean;
+  isAccent?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-sand bg-paper px-4 py-5 text-center">
       <p
         className={`font-display text-2xl font-semibold sm:text-3xl ${
-          accent ? 'text-terracotta' : 'text-ink'
+          isAccent ? 'text-terracotta' : 'text-ink'
         }`}
       >
         {value}
@@ -29,7 +27,13 @@ function StatCard({
   );
 }
 
-/** 待办清单首页（路由 /） */
+interface Todo {
+  id: number;
+  title: string;
+  description: string;
+  completed: boolean;
+}
+
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +43,9 @@ export default function Home() {
     const fetchTodos = async () => {
       try {
         const userId = localStorage.getItem('userId');
+        if (!userId) {
+          throw new Error('用户未登录');
+        }
         const response = await fetch(`/api/todos?userId=${userId}`);
         if (!response.ok) {
           throw new Error('获取待办列表失败');
@@ -61,6 +68,8 @@ export default function Home() {
       if (!todo) return;
 
       const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
       const response = await fetch(`/api/todo/${id}`, {
         method: 'PUT',
         headers: {
@@ -95,11 +104,7 @@ export default function Home() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16 sm:py-24">
-      {/* 标题区 */}
-      <header
-        className="mb-12"
-        style={{ animation: 'fade-in-up 0.6s ease-out' }}
-      >
+      <header className="mb-12" style={{ animation: 'fade-in-up 0.6s ease-out' }}>
         <div className="flex items-center justify-between">
           <div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
@@ -136,24 +141,18 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 统计区 */}
-      <section
-        className="mb-10 grid grid-cols-3 gap-4"
-        style={{ animation: 'fade-in-up 0.6s ease-out 0.1s backwards' }}
-      >
+      <section className="mb-10 grid grid-cols-3 gap-4" style={{ animation: 'fade-in-up 0.6s ease-out 0.1s backwards' }}>
         <StatCard label="全部" value={total} />
-        <StatCard label="已完成" value={completed} accent />
+        <StatCard label="已完成" value={completed} isAccent />
         <StatCard label="待完成" value={pending} />
       </section>
 
-      {/* 错误提示 */}
       {error && (
         <div className="mb-6 rounded-xl border border-terracotta/30 bg-terracotta/5 px-4 py-3 text-sm text-terracotta">
           {error}
         </div>
       )}
 
-      {/* 待办列表 */}
       <section>
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -180,7 +179,6 @@ export default function Home() {
                   animationDelay: `${index * 60}ms`,
                 }}
               >
-                {/* 圆形勾选框 */}
                 <button
                   type="button"
                   onClick={() => toggleTodo(todo.id)}
@@ -196,33 +194,17 @@ export default function Home() {
                     }`}
                   >
                     {todo.completed && (
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </span>
                 </button>
-
-                {/* 待办内容 */}
-                <span
-                  className={`flex-1 text-base transition-colors duration-300 ${
-                    todo.completed ? 'text-ink-muted line-through' : 'text-ink'
-                  }`}
-                >
+                <span className={`flex-1 text-base transition-colors duration-300 ${
+                  todo.completed ? 'text-ink-muted line-through' : 'text-ink'
+                }`}>
                   {todo.title}
                 </span>
-
-                {/* 编辑按钮 */}
                 <Link
                   href={`/edit/${todo.id}`}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft transition-all hover:bg-terracotta/5 hover:text-terracotta"

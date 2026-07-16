@@ -3,24 +3,28 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import TodoItem, { type Todo } from '@/components/TodoItem';
+
+interface Todo {
+  id: number;
+  title: string;
+  description: string;
+  completed: boolean;
+}
 
 function StatCard({
   label,
   value,
-  accent = false,
+  isAccent = false,
 }: {
   label: string;
   value: number;
-  accent?: boolean;
+  isAccent?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-sand bg-paper px-4 py-5 text-center">
-      <p
-        className={`font-display text-2xl font-semibold sm:text-3xl ${
-          accent ? 'text-terracotta' : 'text-ink'
-        }`}
-      >
+      <p className={`font-display text-2xl font-semibold sm:text-3xl ${
+        isAccent ? 'text-terracotta' : 'text-ink'
+      }`}>
         {value}
       </p>
       <p className="mt-1 text-xs text-ink-soft">{label}</p>
@@ -32,16 +36,42 @@ export default function StatsPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const handleToggle = (id: number) => {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
-    );
+  const handleToggle = async (id: number) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      const response = await fetch(`/api/todo/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          completed: !todos.find(t => t.id === id)?.completed,
+          userId,
+        }),
+      });
+
+      if (response.ok) {
+        setTodos((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
+        );
+      }
+    } catch (err) {
+      alert('更新失败，请重试');
+    }
   };
 
   useEffect(() => {
     const fetchTodos = async () => {
       try {
         const userId = localStorage.getItem('userId');
+        if (!userId) {
+          alert('请先登录');
+          window.location.href = '/login';
+          return;
+        }
+
         const response = await fetch(`/api/todos?userId=${userId}`);
         if (!response.ok) {
           throw new Error('获取待办列表失败');
@@ -82,10 +112,7 @@ export default function StatsPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-12 sm:py-16">
-      <header
-        className="mb-8"
-        style={{ animation: 'fade-in-up 0.6s ease-out' }}
-      >
+      <header className="mb-8" style={{ animation: 'fade-in-up 0.6s ease-out' }}>
         <div className="flex items-center justify-between">
           <div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
@@ -115,12 +142,9 @@ export default function StatsPage() {
         </div>
       ) : (
         <>
-          <section
-            className="mb-8 grid grid-cols-3 gap-4"
-            style={{ animation: 'fade-in-up 0.6s ease-out 0.1s backwards' }}
-          >
+          <section className="mb-8 grid grid-cols-3 gap-4" style={{ animation: 'fade-in-up 0.6s ease-out 0.1s backwards' }}>
             <StatCard label="全部任务" value={total} />
-            <StatCard label="已完成任务" value={completed} accent />
+            <StatCard label="已完成任务" value={completed} isAccent />
             <StatCard label="待完成任务" value={pending} />
           </section>
 
@@ -132,10 +156,7 @@ export default function StatsPage() {
               </span>
             </div>
             <div className="mt-3 overflow-hidden rounded-full bg-sand">
-              <div
-                className="h-2 rounded-full bg-terracotta transition-all duration-500"
-                style={{ width: `${completionRate}%` }}
-              />
+              <div className="h-2 rounded-full bg-terracotta transition-all duration-500" style={{ width: `${completionRate}%` }} />
             </div>
             <p className="mt-2 text-xs text-ink-muted">
               共 {total} 项待办，已完成 {completed} 项
@@ -150,12 +171,37 @@ export default function StatsPage() {
             <p className="mb-4 text-sm font-medium text-ink-soft">最近待办</p>
             <ul className="space-y-3">
               {recentTodos.map((todo, index) => (
-                <TodoItem
+                <div
                   key={todo.id}
-                  todo={todo}
-                  onToggle={handleToggle}
-                  index={index}
-                />
+                  className="group flex items-center gap-4 rounded-2xl border border-sand bg-paper px-5 py-4 shadow-sm transition-all duration-300 hover:border-terracotta/30 hover:shadow-md"
+                  style={{
+                    animation: 'fade-in-up 0.5s ease-out backwards',
+                    animationDelay: `${index * 60}ms`,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(todo.id)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-terracotta/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-terracotta/40"
+                  >
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      todo.completed
+                        ? 'border-terracotta bg-terracotta text-white'
+                        : 'border-sand bg-transparent group-hover:border-terracotta/50'
+                    }`}>
+                      {todo.completed && (
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                  <span className={`flex-1 text-base transition-colors duration-300 ${
+                    todo.completed ? 'text-ink-muted line-through' : 'text-ink'
+                  }`}>
+                    {todo.title}
+                  </span>
+                </div>
               ))}
             </ul>
           </section>

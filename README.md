@@ -1,198 +1,159 @@
-\# Todo‑Next‑Flask 待办事项管理系统
+# 个人待办清单管理系统
 
-\## 项目简介
+## 项目简介
 
-本项目采用前后端分离架构：前端基于 Next.js14(App Router) + TypeScript + Tailwind‑CSS + lucide‑react 开发，后端后续使用 Python Flask 框架开发。
+基于 Next.js 14 App Router + Flask + SQLite 构建的全栈待办清单应用，支持多用户注册登录、数据隔离、待办增删改查及统计分析功能。
 
-本次迭代完成全部功能开发：首页移除前端模拟数据，前后端对接；新增`/add`添加待办页面、`/edit/\[id]`编辑页面；后端实现GET、POST、PUT接口，完成参数校验与异常捕获；前端接口请求失败弹出alert提示，原有页面布局和UI样式完全保持不变。
+## 技术栈
 
-项目代码由Trae AI辅助生成，严格遵循Next.js工程规范，拆分独立组件，配置完善TypeScript类型约束。
+| 层级 | 技术 | 版本 |
+|------|------|------|
+| 前端框架 | Next.js | 14.2.x |
+| 前端语言 | TypeScript | - |
+| CSS框架 | Tailwind CSS | 3.x |
+| 后端框架 | Flask | 3.x |
+| 数据库 | SQLite | - |
+| 图标库 | Lucide React | - |
 
-
-
-\## 目录结构
+## 项目目录结构
 
 ```
-
-todo-next-flask-project
-
-├── frontend                 # Next.js 前端项目目录
-
-│   ├── src
-
-│   │   ├── app
-
-│   │   │   ├── page.tsx     # 首页页面 /
-
-│   │   │   ├── add
-
-│   │   │   │   └── page.tsx # 新增待办页面 /add
-
-│   │   │   └── edit
-
-│   │   │       └── \[id]
-
-│   │   │           └── page.tsx # 编辑待办页面 /edit/\[id]
-
-│   │   │   └──stats
-
-│   │   │       └── page.tsx       待办统计页面 
-
-│   │   │   ├── login
-
-│   │   │   │   └── page.tsx       # 登录页面 /login
-
-│   │   │   ├── register
-
-│   │   │   │   └── page.tsx       # 注册页面 /register
-
-│   │   │   ├── auth‑guard.tsx      # 登录鉴权组件
-
-│   │   │   └── layout.tsx         # 全局布局、鉴权入口
-
-│   │   └── components       # 公共组件 TodoItem.tsx
-
+todo-next-flask-project/
+├── frontend/                    # 前端项目
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx        # 首页 - 待办列表
+│   │   │   ├── add/
+│   │   │   │   └── page.tsx    # 新增待办页面
+│   │   │   ├── edit/[id]/
+│   │   │   │   └── page.tsx    # 编辑待办页面（动态路由）
+│   │   │   ├── stats/
+│   │   │   │   └── page.tsx    # 统计分析页面
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx    # 登录页面
+│   │   │   ├── register/
+│   │   │   │   └── page.tsx    # 注册页面
+│   │   │   ├── auth-guard.tsx  # 路由鉴权守卫
+│   │   │   ├── layout.tsx      # 全局布局
+│   │   │   └── globals.css     # 全局样式
+│   │   └── components/
+│   │       └── TodoItem.tsx    # 待办条目组件
 │   ├── package.json
-
 │   ├── tsconfig.json
-
 │   ├── next.config.js
-
 │   └── tailwind.config.ts
-
-├── backend                  # Flask 后端代码目录
-
-│   ├── app.py
-
-│   ├── todo.db               # SQLite数据库，存放用户账号和待办数据
-
-│   └── requirements.txt
-
-├── docs
-
-│   └── screenshots          # AI对话截图、页面预览截图、接口测试截图存放文件夹
-
-│     └──1.docx
-
-│     └──2.docx
-
-│     └──3.docx
-
-│     └──4.docx
-
-│     └──5.docx
-
-├── prompt\_log.md            # AI提示词日志，存放本次和Trae完整对话记录
-
-└── README.md                # 项目介绍文档
-
+├── backend/                     # 后端项目
+│   ├── app.py                  # Flask 应用主文件
+│   ├── requirements.txt        # Python 依赖
+│   ├── .flaskenv               # Flask 环境配置
+│   └── todo.db                 # SQLite 数据库文件
+├── README.md                   # 项目说明文档
+└── API.md                      # API 接口文档
 ```
 
-\## 本地项目启动方式
+## 本地启动步骤
 
-访问预览地址：http://localhost:3000
-
-\### 1.前端启动
+### 1. 启动后端服务
 
 ```bash
-
-cd frontend
-
-npm install
-
-npm run dev
-
-```
-
-\#### 2.后端启动（Flask‑SQLite）后端接口地址：http://localhost:5000
-
-```bash
-
 cd backend
-
 pip install -r requirements.txt
-
 python app.py
-
 ```
 
-\#####后端接口文档
+后端服务运行在 `http://127.0.0.1:5000`
 
-| 请求方式 | 接口地址 | 功能说明 | 参数 | 异常情况 |
+### 2. 启动前端服务
 
-|:---:|:---:|:---:|:---|:---|
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-| GET | /api/todos | 获取全部待办 | 无参数 | 数据库查询失败返回错误信息 |
+前端服务运行在 `http://localhost:3000`
 
-| POST | /api/todo | 新增待办 | title(必填)，description(可选) | title为空返回{"error":"标题不能为空"} |
+### 3. 访问应用
 
-| PUT | /api/todo/<id> | 修改待办 | title、description、completed | id不存在返回{"error":"待办不存在"} |
+打开浏览器访问 `http://localhost:3000`
 
+## 页面与接口功能清单
 
+### 前端页面
 
-\###### 健壮性说明
+| 路由 | 页面 | 功能说明 |
+|------|------|----------|
+| `/` | 首页 | 展示待办列表、完成状态切换、统计卡片、新增/编辑入口 |
+| `/add` | 新增待办 | 输入标题和描述，创建新待办 |
+| `/edit/[id]` | 编辑待办 | 回显待办内容，支持修改标题、描述、完成状态 |
+| `/stats` | 统计分析 | 展示任务完成率、数量统计、进度条、最近待办列表 |
+| `/login` | 登录 | 账号密码登录，验证通过后跳转首页 |
+| `/register` | 注册 | 新用户注册，用户名唯一校验 |
 
-1.GET接口捕获SQLite数据库读取异常；
+### 后端接口
 
-2.POST接口校验标题非空，防止空数据入库；
+| 方法 | 路径 | 功能说明 |
+|------|------|----------|
+| POST | `/api/register` | 用户注册 |
+| POST | `/api/login` | 用户登录，返回 userId |
+| GET | `/api/todos?userId=xxx` | 获取指定用户的待办列表 |
+| POST | `/api/todo` | 新增待办 |
+| PUT | `/api/todo/<id>` | 修改待办（标题、描述、完成状态） |
 
-3.PUT接口校验id是否存在，避免修改不存在的数据；
+## 多用户数据隔离业务说明
 
-4.前端页面接口请求失败给出alert弹窗提示，提升用户体验。
-5.增加用户权限校验：仅允许操作当前登录用户自己创建的待办，跨用户操作拦截。
+### 核心逻辑
 
-\## 功能清单
+1. **用户表与待办表关联**：`todos` 表通过 `user_id` 字段关联 `users` 表，每条待办记录归属特定用户
 
-\### 前端页面（6个独立路由）
+2. **登录时获取 userId**：登录接口返回当前用户的 `userId`，前端存储到 `localStorage`
 
-1\. `/`：首页页面，展示全部待办，统计任务数量；
+3. **待办接口强制过滤**：所有待办 CRUD 操作必须携带 `userId`，后端按 `user_id` 过滤数据，确保用户只能操作自己的任务
 
-2\. `/add`：新增待办页面，填写标题和描述提交新增；
+4. **权限校验**：修改待办时，后端校验请求中的 `userId` 与待办归属的 `user_id` 是否一致，不一致返回 403 权限错误
 
-3\. `/edit/\[id]`：编辑待办页面，回显原有数据，完成修改操作。
+### 数据流向
 
-4\. `/stats`：待办统计页面，布局风格和首页保持一致，展示任务数量、完成进度、最近5条待办。
+```
+用户注册 → 写入 users 表 → 注册成功
+用户登录 → 返回 userId → 前端存储到 localStorage
+获取待办 → 携带 userId → 后端按 user_id 筛选 → 返回该用户的待办
+创建待办 → 携带 userId → 后端写入 todos 表并关联 user_id
+修改待办 → 携带 userId → 后端校验权限 → 更新指定待办
+```
 
-5\. `/login`：登录页面，输入账号密码；只有登录成功之后，才可以访问系统全部页面；未登录强制跳转登录页。
+## AI 代码审查优化内容
 
-6\. `/register`：注册页面，UI样式和登录页面保持统一；前端校验用户名非空、密码长度≥6；注册成功自动跳转登录页面。
-\###多用户数据隔离（本次新增功能）
-1.每条待办任务绑定创建用户 user_id，不同账号数据完全隔离；
-2.新注册空白账号登录首页无任何待办，仅能查看、修改自己创建的任务；
-3.访问、编辑他人待办会返回无权限错误；
-4.登录接口返回 userId，前端本地存储，所有待办请求自动携带用户标识鉴权。
+### 前端优化
 
-\### 后端接口（5个API）
+| 文件 | 优化项 | 说明 |
+|------|--------|------|
+| `page.tsx` | 清理无用导入 | 移除未使用的 `TodoItem` 导入 |
+| `page.tsx` | 命名规范 | `accent` → `isAccent`，语义更清晰 |
+| 全页面 | userId 空值校验 | 所有接口调用前检查 `localStorage.getItem('userId')`，为空则跳转登录 |
+| `login/page.tsx` | 表单校验 | 用户名/密码去空格处理，空值校验 |
+| `login/page.tsx` | 类型安全 | 校验 `data.userId` 为数字类型 |
+| `add/page.tsx` | 前置校验 | 提交前检查 userId，缺失则跳转登录 |
+| `edit/[id]/page.tsx` | ID 类型校验 | `parseInt(params.id, 10)` 添加基数参数，NaN 判断 |
+| `stats/page.tsx` | 修复数据同步 Bug | `handleToggle` 调用后端 API 更新数据，刷新后不丢失 |
+| `stats/page.tsx` | 清理无用导入 | 移除未使用的 `TodoItem` 导入 |
 
-| 请求方式 | 接口地址 | 功能 | 请求参数 | 返回结果说明 |
+### 后端优化
 
-|:---:|:---:|:---|:---|:---|
+| 文件 | 优化项 | 说明 |
+|------|--------|------|
+| `app.py` | 删除冗余函数 | 移除未使用的 `get_user_id_from_request()` |
+| `app.py` | 类型转换 | `userId` 参数强制转换为 `int`，添加格式错误提示 |
+| `app.py` | 修复权限判断 | `int(todo['user_id'])` 转为整数后比较，修复类型不匹配问题 |
+| `app.py` | 参数校验增强 | 新增用户 ID 格式错误、缺少必填字段等异常返回 |
 
-| GET | `/api/todos` | 查询全部待办 | 无 | 返回全部待办列表 |
+## 默认测试账号
 
-| POST | `/api/todo` | 新增待办 | title，completed | 添加一条待办数据 |
+| 用户名 | 密码 | 说明 |
+|--------|------|------|
+| admin | 123456 | 预置测试账号，含初始待办数据 |
 
-| PUT | `/api/todo/<id>` | 修改待办 | completed | 更新待办完成状态 |
+## 线上部署地址
 
-| POST | `/api/login` | 用户登录 | username，password | 账号正确返回{"success": true, "userId": 数字id}，错误返回{"success":false,"msg":"账号或密码错误"} |
-
-| POST | `/api/register` | 用户注册 | username，password | 用户名唯一，重复提示占用；注册成功返回成功提示；后端自动创建user数据表。
-
-\## 项目业务流程
-
-1\. 用户访问系统，未登录状态会被鉴权组件拦截强制跳转到登录页面；
-
-2\. 新用户先进入`/register`页面注册账号，账号存入SQLite数据库；
-
-3\. 注册完成跳转到登录页面，输入账号密码登录；登录成功后前端localStorage保存登录标识；
-
-4\. 登录成功后正常使用首页查看待办、新增待办、编辑待办、查看统计页面；
-
-5\. 用户点击退出登录按钮，清除本地登录缓存，重新回到登录页面。
-6\.登录成功后，本地 localStorage 同时存储 login-token 和 userId；所有待办相关接口自动带上 userId，系统根据用户 ID 过滤专属任务，实现多账号数据分离。
-
-
-\### 测试账号
-
-默认内置账号：用户名：`admin`，密码：`123456`。
-
+- 前端：`[待部署]`
+- 后端：`[待部署]`

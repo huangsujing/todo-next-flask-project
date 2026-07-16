@@ -15,8 +15,16 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!username.trim() || !password.trim()) {
-      alert('请输入账号和密码');
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedUsername) {
+      alert('请输入用户名');
+      return;
+    }
+
+    if (!trimmedPassword) {
+      alert('请输入密码');
       return;
     }
 
@@ -28,12 +36,12 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
+        body: JSON.stringify({ username: trimmedUsername, password: trimmedPassword }),
       });
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && typeof data.userId === 'number') {
         localStorage.setItem('login-token', 'ok');
         localStorage.setItem('userId', String(data.userId));
         router.push('/');
@@ -49,9 +57,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper px-6">
-      <div
-        className="w-full max-w-md animate-[fade-in-up_0.6s_ease-out]"
-      >
+      <div className="w-full max-w-md animate-[fade-in-up_0.6s_ease-out]">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-terracotta/10">
             <LogIn className="h-8 w-8 text-terracotta" />
@@ -88,11 +94,7 @@ export default function LoginPage() {
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-soft transition-colors hover:text-terracotta"
                 aria-label={showPassword ? '隐藏密码' : '显示密码'}
               >
-                {showPassword ? (
-                  <EyeOff className="h-5 w-5" />
-                ) : (
-                  <Eye className="h-5 w-5" />
-                )}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
           </div>

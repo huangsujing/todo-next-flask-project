@@ -14,8 +14,16 @@ export default function AddTodoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       setError('请输入待办标题');
+      return;
+    }
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('请先登录');
+      router.push('/login');
       return;
     }
 
@@ -23,14 +31,13 @@ export default function AddTodoPage() {
     setLoading(true);
 
     try {
-      const userId = localStorage.getItem('userId');
       const response = await fetch('/api/todo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: title.trim(),
+          title: trimmedTitle,
           description: description.trim(),
           userId,
         }),
@@ -50,7 +57,6 @@ export default function AddTodoPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-xl px-6 py-16 sm:py-24">
-      {/* 返回按钮 */}
       <button
         onClick={() => router.back()}
         className="mb-8 flex items-center gap-2 text-ink-soft transition-colors hover:text-terracotta"
@@ -59,7 +65,6 @@ export default function AddTodoPage() {
         <span className="text-sm font-medium">返回列表</span>
       </button>
 
-      {/* 标题区 */}
       <header className="mb-10">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-terracotta">
           Add · 新增待办
@@ -69,14 +74,9 @@ export default function AddTodoPage() {
         </h1>
       </header>
 
-      {/* 表单 */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 标题输入 */}
         <div>
-          <label
-            htmlFor="title"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
+          <label htmlFor="title" className="mb-2 block text-sm font-medium text-ink">
             标题 <span className="text-terracotta">*</span>
           </label>
           <input
@@ -90,12 +90,8 @@ export default function AddTodoPage() {
           />
         </div>
 
-        {/* 描述输入 */}
         <div>
-          <label
-            htmlFor="description"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
+          <label htmlFor="description" className="mb-2 block text-sm font-medium text-ink">
             描述
           </label>
           <textarea
@@ -109,12 +105,8 @@ export default function AddTodoPage() {
           />
         </div>
 
-        {/* 错误提示 */}
-        {error && (
-          <p className="text-sm text-terracotta">{error}</p>
-        )}
+        {error && <p className="text-sm text-terracotta">{error}</p>}
 
-        {/* 提交按钮 */}
         <button
           type="submit"
           disabled={loading}
